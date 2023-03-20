@@ -4,7 +4,8 @@ const bodyParser=require("body-parser");
 const ejs=require("ejs");
 const app=express();
 const mongoose=require('mongoose');
-const md5=require('md5');
+const bcrypt=require('bcrypt');
+const saltRounds=10;
 app.use(express.static("public"));
 app.set("view engine",'ejs');
 app.use(bodyParser.urlencoded({extended:true}));
@@ -14,7 +15,6 @@ const userSchema=new mongoose.Schema({
     password:String
 });
 const User=new mongoose.model("User",userSchema);
-console.log(md5('abc'));
 app.get("/",function(req,res){
     res.render("home");
 });
@@ -26,28 +26,34 @@ app.get("/register",function(req,res){
 });
 app.post("/register",function(req,res)
 {
-    const newUser=new User({
-        email:req.body.username,
-        password:md5(req.body.password)
-    });
-    newUser.save().then(function(result){
-        res.render("secrets");
-    }).then(function(err){
-        console.log(err);
+    bcrypt.hash(req.body.password,saltRounds,function(err,hash)
+    {   
+        const newUser=new User({
+            email:req.body.username,
+            password:hash
+        });
+        newUser.save().then(function(result){
+            res.render("secrets");
+        }).then(function(err){
+            console.log(err);
+        });
     });
 });
 app.post("/login",function(req,res)
 {
     const username=req.body.username;
-    const password=md5(req.body.password);
+    const password=req.body.password;
     User.findOne({email:username}).then(function(result)
     {
         if(result)
         {
-            if(result.password===password)
+            bcrypt.compare(password,result.password,function(err,results)
             {
-                res.render("secrets");
-            }
+                if(results===true)
+                {
+                    res.render("secrets");
+                }
+            });           
         }
     }).catch(function(error)
     {
